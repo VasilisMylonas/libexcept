@@ -34,9 +34,10 @@
 #include <errno.h>
 #include <setjmp.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #define throw __LIBEXCEPT_THROW
-#define try __LIBEXCEPT_TRY
+#define try __LIBEXCEPT_HANDLER __LIBEXCEPT_TRY
 #define catch __LIBEXCEPT_CATCH
 #define finally __LIBEXCEPT_FINALLY
 
@@ -53,7 +54,7 @@ extern void (*libexcept_on_fatal)(int exception);
 
 #define __LIBEXCEPT_THROW(error) (__libexcept_throw_exception(error, __FILE__, __LINE__), abort())
 
-#define __LIBEXCEPT_TRY                                                                            \
+#define __LIBEXCEPT_HANDLER                                                                        \
     jmp_buf __LIBEXCEPT_UNIQUE(local_buffer);                                                      \
     jmp_buf* __LIBEXCEPT_UNIQUE(old_buffer) = *__libexcept_current_context();                      \
     *__libexcept_current_context() = &__LIBEXCEPT_UNIQUE(local_buffer);                            \
@@ -67,8 +68,10 @@ extern void (*libexcept_on_fatal)(int exception);
             {                                                                                      \
                 __LIBEXCEPT_THROW(__libexcept_error);                                              \
             }                                                                                      \
-        }                                                                                          \
-        else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
+        }
+
+#define __LIBEXCEPT_TRY                                                                            \
+    else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
 
 #define __LIBEXCEPT_CATCH(decl)                                                                    \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH &&                                       \

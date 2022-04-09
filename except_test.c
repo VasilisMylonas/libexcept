@@ -55,10 +55,9 @@ void test_no_throw()
 
 int main()
 {
+
     test_throw();
     test_no_throw();
-
-    throw(EINPROGRESS);
 
     return 0;
 }
