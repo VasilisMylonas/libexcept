@@ -54,9 +54,9 @@ void __libexcept_throw_exception(int exception, const char* file, int line)
         longjmp(**__libexcept_current_context(), exception);
     }
 
-    if (libexcept_on_fatal != NULL)
+    if (libexcept_on_unhandled_exception != NULL)
     {
-        libexcept_on_fatal(exception);
+        libexcept_on_unhandled_exception(exception);
     }
     else
     {
@@ -65,4 +65,4 @@ void __libexcept_throw_exception(int exception, const char* file, int line)
 }
 
 void (*libexcept_on_throw)(int exception, const char* file, int line);
-void (*libexcept_on_fatal)(int exception);
+void (*libexcept_on_unhandled_exception)(int exception);

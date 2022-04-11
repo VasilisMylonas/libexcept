@@ -40,9 +40,10 @@
 #define try __LIBEXCEPT_HANDLER __LIBEXCEPT_TRY
 #define catch __LIBEXCEPT_CATCH
 #define finally __LIBEXCEPT_FINALLY
+#define rethrow __LIBEXCEPT_RETHROW
 
 extern void (*libexcept_on_throw)(int exception, const char* file, int line);
-extern void (*libexcept_on_fatal)(int exception);
+extern void (*libexcept_on_unhandled_exception)(int exception);
 
 #define __LIBEXCEPT_STAGE_TRY       0
 #define __LIBEXCEPT_STAGE_CATCH     1
@@ -53,6 +54,7 @@ extern void (*libexcept_on_fatal)(int exception);
 #define __LIBEXCEPT_CONCAT_(a, b)   a##b
 
 #define __LIBEXCEPT_THROW(error) (__libexcept_throw_exception(error, __FILE__, __LINE__), abort())
+#define __LIBEXCEPT_RETHROW()    break
 
 #define __LIBEXCEPT_HANDLER                                                                        \
     jmp_buf __LIBEXCEPT_UNIQUE(local_buffer);                                                      \
