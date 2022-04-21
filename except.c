@@ -24,13 +24,15 @@
 
 #include "except.h"
 
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #ifdef LIBEXCEPT_THREAD_AWARE
 #include <threads.h>
 #endif
+
+#ifdef LIBEXCEPT_SIGNAL_AWARE
+#include <signal.h>
 
 static void __libexcept_handle_signal(int signal)
 {
@@ -47,28 +49,29 @@ static void __libexcept_handle_signal(int signal)
     }
 }
 
-jmp_buf** __libexcept_current_context()
-{
-#ifdef LIBEXCEPT_THREAD_AWARE
-    static thread_local jmp_buf* buffer;
-#else
-    static jmp_buf* buffer;
-#endif
-    return &buffer;
-}
-
-void __libexcept_enable_sigcatch()
+void libexcept_enable_sigcatch()
 {
     signal(SIGILL, __libexcept_handle_signal);
     signal(SIGFPE, __libexcept_handle_signal);
     signal(SIGSEGV, __libexcept_handle_signal);
 }
 
-void __libexcept_disable_sigcatch()
+void libexcept_disable_sigcatch()
 {
     signal(SIGILL, SIG_DFL);
     signal(SIGFPE, SIG_DFL);
     signal(SIGSEGV, SIG_DFL);
+}
+#endif
+
+jmp_buf** __libexcept_current_context()
+{
+#ifdef LIBEXCEPT_THREAD_AWARE
+    static thread_local __LIBEXCEPT_JMP_BUF* buffer;
+#else
+    static jmp_buf* buffer;
+#endif
+    return &buffer;
 }
 
 void __libexcept_throw(int exception, const char* file, int line)
@@ -90,7 +93,7 @@ void __libexcept_throw(int exception, const char* file, int line)
     // If this is NULL then we have reached the end of the chain.
     if (*__libexcept_current_context() != NULL)
     {
-        longjmp(**__libexcept_current_context(), exception);
+        __LIBEXCEPT_LONGJMP(**__libexcept_current_context(), exception);
     }
 
     __libexcept_unhandled(exception);

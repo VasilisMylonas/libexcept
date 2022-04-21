@@ -45,6 +45,11 @@
  * - Do not use break, continue, return, goto or other ways to exit try/catch/finally blocks.
  * - Do not use anything beginning with __libexcept.
  *
+ * Compile with LIBEXCEPT_THREAD_AWARE defined if intending to use the library in a multi-threaded
+ * program.
+ *
+ * Compile with LIBEXCEPT_SIGNAL_AWARE defined if intending to handle signals as exceptions.
+ *
  * TODO: documentation
  */
 
@@ -156,6 +161,21 @@ extern void (*libexcept_on_unexpected)(int exception);
  * @}
  */
 
+#ifdef LIBEXCEPT_SIGNAL_AWARE
+void libexcept_enable_sigcatch();
+void libexcept_disable_sigcatch();
+#endif
+
+#ifdef LIBEXCEPT_SIGNAL_AWARE
+#define __LIBEXCEPT_JMP_BUF        jmp_buf
+#define __LIBEXCEPT_SETJMP(buffer) sigsetjmp(buffer, 1)
+#define __LIBEXCEPT_LONGJMP        siglongjmp
+#else
+#define __LIBEXCEPT_JMP_BUF        sigjmp_buf
+#define __LIBEXCEPT_SETJMP(buffer) setjmp(buffer)
+#define __LIBEXCEPT_LONGJMP        longjmp
+#endif
+
 #define __LIBEXCEPT_STAGE_TRY        0
 #define __LIBEXCEPT_STAGE_CATCH      1
 #define __LIBEXCEPT_STAGE_FINALLY    2
@@ -168,10 +188,11 @@ extern void (*libexcept_on_unexpected)(int exception);
 #define __LIBEXCEPT_RETHROW()        break
 
 #define __LIBEXCEPT_TRY                                                                            \
-    jmp_buf __LIBEXCEPT_UNIQUE(local_buffer);                                                      \
-    jmp_buf* __LIBEXCEPT_UNIQUE(old_buffer) = *__libexcept_current_context();                      \
+    __LIBEXCEPT_JMP_BUF __LIBEXCEPT_UNIQUE(local_buffer);                                          \
+    __LIBEXCEPT_JMP_BUF* __LIBEXCEPT_UNIQUE(old_buffer) = *__libexcept_current_context();          \
     *__libexcept_current_context() = &__LIBEXCEPT_UNIQUE(local_buffer);                            \
-    for (int __libexcept_stage = 0, __libexcept_error = setjmp(__LIBEXCEPT_UNIQUE(local_buffer));  \
+    for (int __libexcept_stage = 0,                                                                \
+             __libexcept_error = __LIBEXCEPT_SETJMP(__LIBEXCEPT_UNIQUE(local_buffer));             \
          __libexcept_stage < 4;                                                                    \
          __libexcept_stage++)                                                                      \
         if (__libexcept_stage == __LIBEXCEPT_STAGE_PROPAGATE)                                      \
@@ -202,9 +223,7 @@ extern void (*libexcept_on_unexpected)(int exception);
     for (__libexcept_stage = __LIBEXCEPT_STAGE_UNEXPECTED; __libexcept_stage != stage;             \
          __libexcept_stage = stage)
 
-jmp_buf** __libexcept_current_context();
-void __libexcept_enable_sigcatch();
-void __libexcept_disable_sigcatch();
+__LIBEXCEPT_JMP_BUF** __libexcept_current_context();
 noreturn void __libexcept_throw(int, const char*, int);
 noreturn void __libexcept_unexpected(int);
 noreturn void __libexcept_unhandled(int);
