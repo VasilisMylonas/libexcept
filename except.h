@@ -51,6 +51,7 @@
 #include <errno.h>
 #include <setjmp.h>
 #include <stddef.h>
+#include <stdnoreturn.h>
 
 /**
  * @defgroup keywords Exception handling keywords.
@@ -204,8 +205,8 @@ extern void (*libexcept_on_unexpected)(int exception);
 jmp_buf** __libexcept_current_context();
 void __libexcept_enable_sigcatch();
 void __libexcept_disable_sigcatch();
-void __libexcept_throw(int, const char*, int);
-void __libexcept_unexpected(int);
-void __libexcept_unhandled(int);
+noreturn void __libexcept_throw(int, const char*, int);
+noreturn void __libexcept_unexpected(int);
+noreturn void __libexcept_unhandled(int);
 
 #endif // EXCEPT_H
