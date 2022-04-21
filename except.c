@@ -24,23 +24,24 @@
 
 #include "except.h"
 
-#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+
+#ifdef LIBEXCEPT_THREAD_AWARE
 #include <threads.h>
+#endif
 
 static void __libexcept_handle_signal(int signal)
 {
     switch (signal)
     {
     case SIGILL:
-        throw(EILSEQ);
+        __LIBEXCEPT_THROW(EILSEQ);
     case SIGFPE:
-        throw(EDOM);
+        __LIBEXCEPT_THROW(EDOM);
     case SIGSEGV:
-        throw(EFAULT);
+        __LIBEXCEPT_THROW(EFAULT);
     default:
         break;
     }
@@ -48,7 +49,11 @@ static void __libexcept_handle_signal(int signal)
 
 jmp_buf** __libexcept_current_context()
 {
+#ifdef LIBEXCEPT_THREAD_AWARE
     static thread_local jmp_buf* buffer;
+#else
+    static jmp_buf* buffer;
+#endif
     return &buffer;
 }
 
@@ -68,11 +73,21 @@ void __libexcept_disable_sigcatch()
 
 void __libexcept_throw(int exception, const char* file, int line)
 {
+    // Call the user defined handler if possible.
     if (libexcept_on_throw != NULL)
     {
-        libexcept_on_throw(exception, file, line);
+        // Exceptions are not expected to be thrown.
+        __LIBEXCEPT_TRY
+        {
+            libexcept_on_throw(exception, file, line);
+        }
+        __LIBEXCEPT_CATCH(int error)
+        {
+            __libexcept_unexpected(error);
+        }
     }
 
+    // If this is NULL then we have reached the end of the chain.
     if (*__libexcept_current_context() != NULL)
     {
         longjmp(**__libexcept_current_context(), exception);
@@ -83,26 +98,57 @@ void __libexcept_throw(int exception, const char* file, int line)
 
 void __libexcept_unhandled(int exception)
 {
+    // Call the user provided handler if possible.
     if (libexcept_on_unhandled != NULL)
     {
-        libexcept_on_unhandled(exception);
+        // Exceptions are not expected to be thrown.
+        __LIBEXCEPT_TRY
+        {
+            libexcept_on_unhandled(exception);
+        }
+        __LIBEXCEPT_CATCH(int error)
+        {
+            __libexcept_unexpected(error);
+        }
     }
     else
     {
         fputs("Unhandled exception\n", stderr);
     }
+
+#ifdef LIBEXCEPT_THREAD_AWARE
+    thrd_exit(EXIT_FAILURE);
+#else
+    abort();
+#endif
 }
 
 void __libexcept_unexpected(int exception)
 {
+    // Call the user provided handler if possible.
     if (libexcept_on_unexpected != NULL)
     {
-        libexcept_on_unexpected(exception);
+        __LIBEXCEPT_TRY
+        {
+            libexcept_on_unexpected(exception);
+        }
+        __LIBEXCEPT_CATCH(int error)
+        {
+            // If an exception occurs, reset the handler and try again.
+            libexcept_on_unexpected = NULL;
+            __libexcept_unexpected(error);
+        }
     }
     else
     {
         fputs("Unexpected exception\n", stderr);
     }
+
+#ifdef LIBEXCEPT_THREAD_AWARE
+    thrd_exit(EXIT_FAILURE);
+#else
+    abort();
+#endif
 }
 
 void (*libexcept_on_throw)(int, const char*, int);

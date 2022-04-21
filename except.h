@@ -51,21 +51,60 @@
 #include <errno.h>
 #include <setjmp.h>
 #include <stddef.h>
-#include <stdlib.h>
 
 /**
  * @defgroup keywords Exception handling keywords.
  *
- * TODO: documentation
+ * try: Begins a code block from which exceptions are expected to be thrown.
+ * catch: Follows a try block and only executes when an exception is thrown.
+ * finally: Follows a try block and is always executed. This is useful for cleaning up resources.
+ *
+ * catch/finally blocks are only required to come after a try block but not in a specific order. In
+ * particular all of the following are valid:
+ *
+ * @code
+ *
+ * try { ... }
+ * catch (int error) { ... }
+ * finally { ... }
+ *
+ * try { ... }
+ * finally { ... }
+ * catch (int error) { ... }
+ *
+ * try { ... }
+ * catch (int error) { ... }
+ *
+ * try { ... }
+ * finally { ... }
+ *
+ * @endcode
+ *
+ * throw: Throws an exception. Execution of the current function immediately halts.
+ * rethrow: Re-throws an exception caught in a catch block. This will preserve the original
+ *          exception origin information. TODO: This is not actually the case yet.
+ *
+ *
+ * If any of these keyword macros interfere with other symbol names you may choose to prevent their
+ * definition. This can be done by defining the LIBEXCEPT_NO_KEYWORDS macro. The same constructs can
+ * be used under the following names:
+ *
+ * __LIBEXCEPT_TRY
+ * __LIBEXCEPT_CATCH
+ * __LIBEXCEPT_FINALLY
+ * __LIBEXCEPT_THROW
+ * __LIBEXCEPT_RETHROW
  *
  * @{
  */
 
-#define throw __LIBEXCEPT_THROW
-#define try __LIBEXCEPT_HANDLER __LIBEXCEPT_TRY
+#ifndef LIBEXCEPT_NO_KEYWORDS
+#define try __LIBEXCEPT_TRY
 #define catch __LIBEXCEPT_CATCH
 #define finally __LIBEXCEPT_FINALLY
+#define throw __LIBEXCEPT_THROW
 #define rethrow __LIBEXCEPT_RETHROW
+#endif
 
 /**
  * @}
@@ -80,9 +119,10 @@
  * The default implementations just print a simple message to stderr. To restore the default
  * implementations just set these back to NULL.
  *
- * These functions must return normally and are not allowed to call functions that may throw
- * exceptions. Ideally they should just perform some logging set a flag and return. Otherwise
- * unexpected things can happen. It is up to the programmer to ensure correct use.
+ * Ideally these functions should just perform some logging or set a flag and return. If any of
+ * these throw an exception then the default unexpected handler is called and the program is
+ * terminated. If these function never return to their callers then the behavior is undefined. It is
+ * up to the programmer to ensure correct use.
  *
  * @{
  */
@@ -104,7 +144,8 @@ extern void (*libexcept_on_throw)(int exception, const char* file, int line);
 extern void (*libexcept_on_unhandled)(int exception);
 
 /**
- * Called whenever an exception is thrown from a catch or finally clause.
+ * Called whenever an exception is thrown from a catch or finally clause or from any of the user
+ * defined event handlers.
  *
  * @param exception The exception that was thrown.
  */
@@ -122,10 +163,10 @@ extern void (*libexcept_on_unexpected)(int exception);
 #define __LIBEXCEPT_UNIQUE(var)      __LIBEXCEPT_CONCAT(__libexcept_##var, __LINE__)
 #define __LIBEXCEPT_CONCAT(a, b)     __LIBEXCEPT_CONCAT_(a, b)
 #define __LIBEXCEPT_CONCAT_(a, b)    a##b
-#define __LIBEXCEPT_THROW(error)     (__libexcept_throw(error, __FILE__, __LINE__), abort())
+#define __LIBEXCEPT_THROW(error)     __libexcept_throw(error, __FILE__, __LINE__)
 #define __LIBEXCEPT_RETHROW()        break
 
-#define __LIBEXCEPT_HANDLER                                                                        \
+#define __LIBEXCEPT_TRY                                                                            \
     jmp_buf __LIBEXCEPT_UNIQUE(local_buffer);                                                      \
     jmp_buf* __LIBEXCEPT_UNIQUE(old_buffer) = *__libexcept_current_context();                      \
     *__libexcept_current_context() = &__LIBEXCEPT_UNIQUE(local_buffer);                            \
@@ -143,11 +184,8 @@ extern void (*libexcept_on_unexpected)(int exception);
         else if (__libexcept_stage == __LIBEXCEPT_STAGE_UNEXPECTED)                                \
         {                                                                                          \
             __libexcept_unexpected(__libexcept_error);                                             \
-            abort();                                                                               \
-        }
-
-#define __LIBEXCEPT_TRY                                                                            \
-    else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
+        }                                                                                          \
+        else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
 
 #define __LIBEXCEPT_CATCH(decl)                                                                    \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0)               \
