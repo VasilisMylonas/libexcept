@@ -12,7 +12,7 @@ void test_throw()
     try
     {
         exec_try = true;
-        throw_value(int, EINVAL);
+        throw(int, EINVAL);
         assert(false);
     }
     catch (int)
@@ -53,24 +53,31 @@ void test_no_throw()
     assert(exec_finally);
 }
 
-typedef struct
+void test_signal()
 {
-    const char* name;
-} libexcept_error_t;
+    libexcept_enable_sigcatch();
+
+    bool error_caught = false;
+    try
+    {
+        int y = 0;
+        int x = 0 / y;
+    }
+    catch (arithmetic_error_t)
+    {
+        error_caught = true;
+    }
+
+    assert(error_caught);
+
+    libexcept_disable_sigcatch();
+}
 
 int main()
 {
     test_throw();
     test_no_throw();
-
-    try
-    {
-        libexcept_error_t error;
-        throw(libexcept_error_t, error);
-    }
-    catch (libexcept_error_t)
-    {
-    }
+    test_signal();
 
     return 0;
 }

@@ -62,7 +62,7 @@
  * catch: Follows a try block and only executes when an exception is thrown.
  * finally: Follows a try block and is always executed. This is useful for cleaning up resources.
  *
- * TODO: catch_any, throw_value
+ * TODO: catch_any
  *
  * catch/finally blocks are only required to come after a try block but not in a specific order. In
  * particular all of the following are valid:
@@ -87,7 +87,7 @@
  *
  * throw: Throws an exception. Execution of the current function immediately halts.
  * rethrow: Re-throws an exception caught in a catch block. This will preserve the original
- *          exception origin information. TODO: This is not actually the case yet.
+ *          exception object.
  *
  *
  * If any of these keyword macros interfere with other symbol names you may choose to prevent their
@@ -99,7 +99,6 @@
  * __LIBEXCEPT_CATCH_ANY
  * __LIBEXCEPT_FINALLY
  * __LIBEXCEPT_THROW
- * __LIBEXCEPT_THROW_VALUE
  * __LIBEXCEPT_RETHROW
  *
  * @{
@@ -111,13 +110,24 @@
 #define catch_any __LIBEXCEPT_CATCH_ANY
 #define finally   __LIBEXCEPT_FINALLY
 #define throw __LIBEXCEPT_THROW
-#define throw_value __LIBEXCEPT_THROW_VALUE
-#define rethrow     __LIBEXCEPT_RETHROW
+#define rethrow __LIBEXCEPT_RETHROW
 #endif
 
 /**
  * @}
  */
+
+/**
+ * Defined when libexcept uses setjmp/longjmp for its implementation.
+ *
+ * Currently this is always defined.
+ */
+#define LIBEXCEPT_SJLJ
+
+/**
+ * The maximum size of an object allowed to be thrown.
+ */
+#define LIBEXCEPT_MAX_THROWABLE_SIZE 128
 
 /**
  * @defgroup event_hooks Event hooks.
@@ -162,10 +172,6 @@ extern void (*libexcept_on_unexpected)(void* exception);
  * @}
  */
 
-// TODO
-#define LIBEXCEPT_MAX_THROWABLE_SIZE 128
-#define LIBEXCEPT_SJLJ
-
 #ifdef LIBEXCEPT_SIGNAL_AWARE
 // TODO: Documentation
 
@@ -178,6 +184,37 @@ void libexcept_enable_sigcatch();
  * Disables transforming of signals to exceptions.
  */
 void libexcept_disable_sigcatch();
+
+typedef struct
+{
+    const char* message;
+    void* pc;
+} arithmetic_error_t;
+
+typedef struct
+{
+    const char* message;
+    void* pc;
+} illegal_instruction_error_t;
+
+typedef struct
+{
+    const char* message;
+    void* pc;
+} stack_corruption_error_t;
+
+typedef struct
+{
+    const char* message;
+    void* address;
+} access_violation_t;
+
+typedef struct
+{
+    const char* message;
+    void* address;
+} misaligned_access_error_t;
+
 #endif
 
 #ifdef LIBEXCEPT_SIGNAL_AWARE
@@ -198,12 +235,11 @@ void libexcept_disable_sigcatch();
 #define __LIBEXCEPT_UNIQUE(var)      __LIBEXCEPT_CONCAT(__libexcept_##var, __LINE__)
 #define __LIBEXCEPT_CONCAT(a, b)     __LIBEXCEPT_CONCAT_(a, b)
 #define __LIBEXCEPT_CONCAT_(a, b)    a##b
-#define __LIBEXCEPT_THROW(T, error)                                                                \
-    __libexcept_throw(#T, sizeof(T), &(error));                                                    \
+#define __LIBEXCEPT_THROW(T, object)                                                               \
+    __libexcept_throw(#T, sizeof(T), (T[1]){object});                                              \
     static_assert(sizeof(T) <= LIBEXCEPT_MAX_THROWABLE_SIZE,                                       \
                   "Throwable object size exceeds the maximum supported by libexcept")
-#define __LIBEXCEPT_THROW_VALUE(T, value) __LIBEXCEPT_THROW(T, (T[1]){value})
-#define __LIBEXCEPT_RETHROW()             break
+#define __LIBEXCEPT_RETHROW() break
 
 #define __LIBEXCEPT_TRY                                                                            \
     __LIBEXCEPT_JMP_BUF __LIBEXCEPT_UNIQUE(local_buffer);                                          \

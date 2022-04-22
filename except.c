@@ -40,27 +40,98 @@ static const char* current_id;
 #ifdef LIBEXCEPT_SIGNAL_AWARE
 #include <signal.h>
 
-static void __libexcept_handle_signal(int signal)
+static void __libexcept_handle_signal(int signal, siginfo_t* info, void* context)
 {
-    // TODO
-    // switch (signal)
-    // {
-    // case SIGILL:
-    //     __LIBEXCEPT_THROW(EILSEQ);
-    // case SIGFPE:
-    //     __LIBEXCEPT_THROW(EDOM);
-    // case SIGSEGV:
-    //     __LIBEXCEPT_THROW(EFAULT);
-    // default:
-    //     break;
-    // }
+    switch (signal)
+    {
+    case SIGFPE: {
+        arithmetic_error_t error = {
+            .pc = info->si_addr,
+        };
+
+        switch (info->si_code)
+        {
+        case FPE_INTDIV:
+            error.message = "Integer division by zero.";
+            break;
+        case FPE_INTOVF:
+            error.message = "Integer overflow.";
+            break;
+        case FPE_FLTDIV:
+            error.message = "Floating point division by zero.";
+            break;
+        case FPE_FLTOVF:
+            error.message = "Floating point overflow.";
+            break;
+        case FPE_FLTUND:
+            error.message = "Floating point underflow.";
+            break;
+        case FPE_FLTRES:
+            error.message = "Floating point inexact result.";
+            break;
+        case FPE_FLTINV:
+            error.message = "Invalid floating point operation.";
+            break;
+        case FPE_FLTSUB:
+            error.message = "Subscript out of range.";
+            break;
+        default:
+            error.message = "Unknown arithmetic exception.";
+            break;
+        }
+        throw(arithmetic_error_t, error);
+    }
+    case SIGBUS:
+        if (info->si_code == BUS_ADRALN)
+        {
+            misaligned_access_error_t error = {
+                .message = "Invalid address alignment.",
+                .address = info->si_addr,
+            };
+            throw(misaligned_access_error_t, error);
+        }
+    case SIGSEGV: {
+        access_violation_t error = {
+            .message = "Access violation.",
+            .address = info->si_addr,
+        };
+        throw(access_violation_t, error);
+    }
+    case SIGILL: {
+        if (info->si_code == ILL_BADSTK)
+        {
+            stack_corruption_error_t error = {
+                .message = "Internal stack error.",
+                .pc = info->si_addr,
+            };
+            throw(stack_corruption_error_t, error);
+        }
+        else
+        {
+            illegal_instruction_error_t error = {
+                .message = "Illegal instruction.",
+                .pc = info->si_addr,
+            };
+            throw(illegal_instruction_error_t, error);
+        }
+    }
+
+    default:
+        abort();
+    }
 }
 
 void libexcept_enable_sigcatch()
 {
-    signal(SIGILL, __libexcept_handle_signal);
-    signal(SIGFPE, __libexcept_handle_signal);
-    signal(SIGSEGV, __libexcept_handle_signal);
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = __libexcept_handle_signal;
+    sigemptyset(&sa.sa_mask);
+
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
 }
 
 void libexcept_disable_sigcatch()
@@ -68,6 +139,7 @@ void libexcept_disable_sigcatch()
     signal(SIGILL, SIG_DFL);
     signal(SIGFPE, SIG_DFL);
     signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
 }
 #endif
 
