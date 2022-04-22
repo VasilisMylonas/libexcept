@@ -16,9 +16,15 @@ This library provides a way of signaling and handling errors similar to other la
 - optional thread awareness.
 - inline documentation with examples.
 
+## How to use
+
+If using CMake simply use `add_subdirectory` to add the directory containing the project and link to the `except` target. Then simply include [except.h](except.h). No additional setup is required for exceptions to work.
+
+Documentation is provided in the header along with examples.
+
 ## Requirements
 
-For building the project CMake version 3 or newer and a compiler supporting C11 features is required.
+For building the project [CMake](https://cmake.org/) version 3 or newer and a compiler supporting C11 features is required.
 
 ## Building
 
