@@ -15,7 +15,7 @@ void test_throw()
         throw(int, EINVAL);
         assert(false);
     }
-    catch (int)
+    catch (int, e)
     {
         exec_catch = true;
     }
@@ -39,7 +39,7 @@ void test_no_throw()
     {
         exec_try = true;
     }
-    catch (int)
+    catch (int, e)
     {
         exec_catch = true;
     }
@@ -63,7 +63,7 @@ void test_signal()
         int y = 0;
         int x = 0 / y;
     }
-    catch (arithmetic_error_t)
+    catch (arithmetic_error_t, e)
     {
         error_caught = true;
     }

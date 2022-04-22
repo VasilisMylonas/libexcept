@@ -263,11 +263,13 @@ typedef struct
         }                                                                                          \
         else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
 
-#define __LIBEXCEPT_CATCH(type)                                                                    \
+#define __LIBEXCEPT_CATCH(T, var)                                                                  \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0 &&             \
-             __libexcept_personality(#type))                                                       \
-        __LIBEXCEPT_UNEXPECTED_LOOP(__LIBEXCEPT_STAGE_CATCH) for (; __libexcept_error != 0;        \
-                                                                  __libexcept_error = 0)
+             __libexcept_personality(#T))                                                          \
+        __LIBEXCEPT_UNEXPECTED_LOOP(                                                               \
+            __LIBEXCEPT_STAGE_CATCH) for (T var = *(T*)__libexcept_current_exception();            \
+                                          __libexcept_error != 0;                                  \
+                                          __libexcept_error = 0)
 
 #define __LIBEXCEPT_CATCH_ANY                                                                      \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0)               \
