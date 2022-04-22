@@ -12,10 +12,10 @@ void test_throw()
     try
     {
         exec_try = true;
-        throw(EINVAL);
+        throw_value(int, EINVAL);
         assert(false);
     }
-    catch (int error)
+    catch (int)
     {
         exec_catch = true;
     }
@@ -39,7 +39,7 @@ void test_no_throw()
     {
         exec_try = true;
     }
-    catch (int error)
+    catch (int)
     {
         exec_catch = true;
     }
@@ -53,10 +53,24 @@ void test_no_throw()
     assert(exec_finally);
 }
 
+typedef struct
+{
+    const char* name;
+} libexcept_error_t;
+
 int main()
 {
     test_throw();
     test_no_throw();
+
+    try
+    {
+        libexcept_error_t error;
+        throw(libexcept_error_t, error);
+    }
+    catch (libexcept_error_t)
+    {
+    }
 
     return 0;
 }

@@ -36,10 +36,6 @@
  * libexcept provides a simple exception implementation in pure C. It does this by providing macros
  * that use setjmp and longjmp in a way that simulates try/catch/finally blocks.
  *
- * libexcept currently only allows throwing of int values but this may change in the future. It is
- * recommended that you use negative values for custom error codes as positive ones are by
- * convention errno constants.
- *
  * Safety rules:
  * - Only use rethrow() inside catch blocks.
  * - Do not use break, continue, return, goto or other ways to exit try/catch/finally blocks.
@@ -53,6 +49,7 @@
  * TODO: documentation
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <setjmp.h>
 #include <stddef.h>
@@ -64,6 +61,8 @@
  * try: Begins a code block from which exceptions are expected to be thrown.
  * catch: Follows a try block and only executes when an exception is thrown.
  * finally: Follows a try block and is always executed. This is useful for cleaning up resources.
+ *
+ * TODO: catch_any, throw_value
  *
  * catch/finally blocks are only required to come after a try block but not in a specific order. In
  * particular all of the following are valid:
@@ -97,8 +96,10 @@
  *
  * __LIBEXCEPT_TRY
  * __LIBEXCEPT_CATCH
+ * __LIBEXCEPT_CATCH_ANY
  * __LIBEXCEPT_FINALLY
  * __LIBEXCEPT_THROW
+ * __LIBEXCEPT_THROW_VALUE
  * __LIBEXCEPT_RETHROW
  *
  * @{
@@ -107,9 +108,11 @@
 #ifndef LIBEXCEPT_NO_KEYWORDS
 #define try __LIBEXCEPT_TRY
 #define catch __LIBEXCEPT_CATCH
-#define finally __LIBEXCEPT_FINALLY
+#define catch_any __LIBEXCEPT_CATCH_ANY
+#define finally   __LIBEXCEPT_FINALLY
 #define throw __LIBEXCEPT_THROW
-#define rethrow __LIBEXCEPT_RETHROW
+#define throw_value __LIBEXCEPT_THROW_VALUE
+#define rethrow     __LIBEXCEPT_RETHROW
 #endif
 
 /**
@@ -137,17 +140,15 @@
  * Called whenever an exception is thrown.
  *
  * @param exception The exception that was thrown.
- * @param file The file name where the exception was thrown from.
- * @param line The line number where the exception was thrown from.
  */
-extern void (*libexcept_on_throw)(int exception, const char* file, int line);
+extern void (*libexcept_on_throw)(void* exception);
 
 /**
  * Called whenever an exception is never caught.
  *
  * @param exception The exception that was thrown.
  */
-extern void (*libexcept_on_unhandled)(int exception);
+extern void (*libexcept_on_unhandled)(void* exception);
 
 /**
  * Called whenever an exception is thrown from a catch or finally clause or from any of the user
@@ -155,14 +156,27 @@ extern void (*libexcept_on_unhandled)(int exception);
  *
  * @param exception The exception that was thrown.
  */
-extern void (*libexcept_on_unexpected)(int exception);
+extern void (*libexcept_on_unexpected)(void* exception);
 
 /**
  * @}
  */
 
+// TODO
+#define LIBEXCEPT_MAX_THROWABLE_SIZE 128
+#define LIBEXCEPT_SJLJ
+
 #ifdef LIBEXCEPT_SIGNAL_AWARE
+// TODO: Documentation
+
+/**
+ * Enables transforming of signals to exceptions.
+ */
 void libexcept_enable_sigcatch();
+
+/**
+ * Disables transforming of signals to exceptions.
+ */
 void libexcept_disable_sigcatch();
 #endif
 
@@ -184,8 +198,12 @@ void libexcept_disable_sigcatch();
 #define __LIBEXCEPT_UNIQUE(var)      __LIBEXCEPT_CONCAT(__libexcept_##var, __LINE__)
 #define __LIBEXCEPT_CONCAT(a, b)     __LIBEXCEPT_CONCAT_(a, b)
 #define __LIBEXCEPT_CONCAT_(a, b)    a##b
-#define __LIBEXCEPT_THROW(error)     __libexcept_throw(error, __FILE__, __LINE__)
-#define __LIBEXCEPT_RETHROW()        break
+#define __LIBEXCEPT_THROW(T, error)                                                                \
+    __libexcept_throw(#T, sizeof(T), &(error));                                                    \
+    static_assert(sizeof(T) <= LIBEXCEPT_MAX_THROWABLE_SIZE,                                       \
+                  "Throwable object size exceeds the maximum supported by libexcept")
+#define __LIBEXCEPT_THROW_VALUE(T, value) __LIBEXCEPT_THROW(T, (T[1]){value})
+#define __LIBEXCEPT_RETHROW()             break
 
 #define __LIBEXCEPT_TRY                                                                            \
     __LIBEXCEPT_JMP_BUF __LIBEXCEPT_UNIQUE(local_buffer);                                          \
@@ -200,19 +218,24 @@ void libexcept_disable_sigcatch();
             *__libexcept_current_context() = __LIBEXCEPT_UNIQUE(old_buffer);                       \
             if (__libexcept_error != 0)                                                            \
             {                                                                                      \
-                __LIBEXCEPT_THROW(__libexcept_error);                                              \
+                __libexcept_throw(NULL, 0, NULL);                                                  \
             }                                                                                      \
         }                                                                                          \
         else if (__libexcept_stage == __LIBEXCEPT_STAGE_UNEXPECTED)                                \
         {                                                                                          \
-            __libexcept_unexpected(__libexcept_error);                                             \
+            __libexcept_unexpected();                                                              \
         }                                                                                          \
         else if (__libexcept_stage == __LIBEXCEPT_STAGE_TRY && __libexcept_error == 0)
 
-#define __LIBEXCEPT_CATCH(decl)                                                                    \
+#define __LIBEXCEPT_CATCH(type)                                                                    \
+    else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0 &&             \
+             __libexcept_personality(#type))                                                       \
+        __LIBEXCEPT_UNEXPECTED_LOOP(__LIBEXCEPT_STAGE_CATCH) for (; __libexcept_error != 0;        \
+                                                                  __libexcept_error = 0)
+
+#define __LIBEXCEPT_CATCH_ANY                                                                      \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0)               \
-        __LIBEXCEPT_UNEXPECTED_LOOP(__LIBEXCEPT_STAGE_CATCH) for (decl = __libexcept_error;        \
-                                                                  __libexcept_error != 0;          \
+        __LIBEXCEPT_UNEXPECTED_LOOP(__LIBEXCEPT_STAGE_CATCH) for (; __libexcept_error != 0;        \
                                                                   __libexcept_error = 0)
 
 #define __LIBEXCEPT_FINALLY                                                                        \
@@ -224,8 +247,10 @@ void libexcept_disable_sigcatch();
          __libexcept_stage = stage)
 
 __LIBEXCEPT_JMP_BUF** __libexcept_current_context();
-noreturn void __libexcept_throw(int, const char*, int);
-noreturn void __libexcept_unexpected(int);
-noreturn void __libexcept_unhandled(int);
+noreturn void __libexcept_throw(const char*, size_t, void*);
+noreturn void __libexcept_unexpected();
+noreturn void __libexcept_unhandled();
+int __libexcept_personality(const char*);
+void* __libexcept_current_exception();
 
 #endif // EXCEPT_H

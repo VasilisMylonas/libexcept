@@ -26,9 +26,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef LIBEXCEPT_THREAD_AWARE
 #include <threads.h>
+static thread_local char current_exception[LIBEXCEPT_MAX_THROWABLE_SIZE];
+static thread_local const char* current_id;
+#else
+static char current_exception[LIBEXCEPT_MAX_THROWABLE_SIZE];
+static const char* current_id;
 #endif
 
 #ifdef LIBEXCEPT_SIGNAL_AWARE
@@ -36,17 +42,18 @@
 
 static void __libexcept_handle_signal(int signal)
 {
-    switch (signal)
-    {
-    case SIGILL:
-        __LIBEXCEPT_THROW(EILSEQ);
-    case SIGFPE:
-        __LIBEXCEPT_THROW(EDOM);
-    case SIGSEGV:
-        __LIBEXCEPT_THROW(EFAULT);
-    default:
-        break;
-    }
+    // TODO
+    // switch (signal)
+    // {
+    // case SIGILL:
+    //     __LIBEXCEPT_THROW(EILSEQ);
+    // case SIGFPE:
+    //     __LIBEXCEPT_THROW(EDOM);
+    // case SIGSEGV:
+    //     __LIBEXCEPT_THROW(EFAULT);
+    // default:
+    //     break;
+    // }
 }
 
 void libexcept_enable_sigcatch()
@@ -74,32 +81,39 @@ jmp_buf** __libexcept_current_context()
     return &buffer;
 }
 
-void __libexcept_throw(int exception, const char* file, int line)
+void __libexcept_throw(const char* id, size_t exception_size, void* exception)
 {
+    // id is NULL only when rethrowing
+    if (id != NULL)
+    {
+        memcpy(current_exception, exception, exception_size);
+        current_id = id;
+    }
+
     // Call the user defined handler if possible.
     if (libexcept_on_throw != NULL)
     {
         // Exceptions are not expected to be thrown.
         __LIBEXCEPT_TRY
         {
-            libexcept_on_throw(exception, file, line);
+            libexcept_on_throw(current_exception);
         }
-        __LIBEXCEPT_CATCH(int error)
+        __LIBEXCEPT_CATCH_ANY
         {
-            __libexcept_unexpected(error);
+            __libexcept_unexpected();
         }
     }
 
     // If this is NULL then we have reached the end of the chain.
     if (*__libexcept_current_context() != NULL)
     {
-        __LIBEXCEPT_LONGJMP(**__libexcept_current_context(), exception);
+        __LIBEXCEPT_LONGJMP(**__libexcept_current_context(), 1);
     }
 
-    __libexcept_unhandled(exception);
+    __libexcept_unhandled();
 }
 
-void __libexcept_unhandled(int exception)
+void __libexcept_unhandled()
 {
     // Call the user provided handler if possible.
     if (libexcept_on_unhandled != NULL)
@@ -107,11 +121,11 @@ void __libexcept_unhandled(int exception)
         // Exceptions are not expected to be thrown.
         __LIBEXCEPT_TRY
         {
-            libexcept_on_unhandled(exception);
+            libexcept_on_unhandled(__libexcept_current_exception());
         }
-        __LIBEXCEPT_CATCH(int error)
+        __LIBEXCEPT_CATCH_ANY
         {
-            __libexcept_unexpected(error);
+            __libexcept_unexpected();
         }
     }
     else
@@ -126,20 +140,20 @@ void __libexcept_unhandled(int exception)
 #endif
 }
 
-void __libexcept_unexpected(int exception)
+void __libexcept_unexpected()
 {
     // Call the user provided handler if possible.
     if (libexcept_on_unexpected != NULL)
     {
         __LIBEXCEPT_TRY
         {
-            libexcept_on_unexpected(exception);
+            libexcept_on_unexpected(current_exception);
         }
-        __LIBEXCEPT_CATCH(int error)
+        __LIBEXCEPT_CATCH_ANY
         {
             // If an exception occurs, reset the handler and try again.
             libexcept_on_unexpected = NULL;
-            __libexcept_unexpected(error);
+            __libexcept_unexpected();
         }
     }
     else
@@ -154,6 +168,16 @@ void __libexcept_unexpected(int exception)
 #endif
 }
 
-void (*libexcept_on_throw)(int, const char*, int);
-void (*libexcept_on_unhandled)(int);
-void (*libexcept_on_unexpected)(int);
+void* __libexcept_current_exception()
+{
+    return current_exception;
+}
+
+int __libexcept_personality(const char* id)
+{
+    return strcmp(current_id, id) == 0;
+}
+
+void (*libexcept_on_throw)(void*);
+void (*libexcept_on_unhandled)(void*);
+void (*libexcept_on_unexpected)(void*);
