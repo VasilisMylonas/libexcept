@@ -53,6 +53,8 @@ void test_no_throw()
     assert(exec_finally);
 }
 
+#include <signal.h>
+
 void test_signal()
 {
     libexcept_enable_sigcatch();
@@ -60,8 +62,7 @@ void test_signal()
     bool error_caught = false;
     try
     {
-        int y = 0;
-        int x = 0 / y;
+        raise(SIGFPE);
     }
     catch (arithmetic_error_t, e)
     {

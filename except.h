@@ -1,26 +1,28 @@
-//
-// The MIT License (MIT)
-//
-// Copyright (c) 2022 Vasilis Mylonas
-//
-//  Permission is hereby granted, free of charge, to any person obtaining a
-//  copy of this software and associated documentation files (the "Software"),
-//  to deal in the Software without restriction, including without limitation
-//  the rights to use, copy, modify, merge, publish, distribute, sublicense,
-//  and/or sell copies of the Software, and to permit persons to whom the
-//  Software is furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in
-//  all copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-//  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-//  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-//  DEALINGS IN THE SOFTWARE.
-//
+/*
+  This file is part of libexcept (https://github.com/VasilisMylonas/libexcept).
+
+  The MIT License (MIT)
+
+  Copyright (c) 2022 Vasilis Mylonas
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+ */
 
 #ifndef EXCEPT_H
 #define EXCEPT_H
@@ -41,13 +43,10 @@
  * - Do not use break, continue, return, goto or other ways to exit try/catch/finally blocks.
  * - Do not use anything beginning with __libexcept.
  *
- * Compile with LIBEXCEPT_THREAD_AWARE defined if intending to use the library in a multi-threaded
- * program.
- *
- * Compile with LIBEXCEPT_SIGNAL_AWARE defined if intending to handle signals as exceptions.
- *
  * TODO: documentation
  */
+
+#include "config.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -116,13 +115,6 @@
 /**
  * @}
  */
-
-/**
- * Defined when libexcept uses setjmp/longjmp for its implementation.
- *
- * Currently this is always defined.
- */
-#define LIBEXCEPT_SJLJ
 
 /**
  * The maximum size of an object allowed to be thrown.

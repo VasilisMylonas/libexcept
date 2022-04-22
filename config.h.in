@@ -1,0 +1,21 @@
+#ifndef LIBEXCEPT_CONFIG_H
+#define LIBEXCEPT_CONFIG_H
+
+/**
+ * Defined when libexcept is compiled with signal-catching support.
+ */
+#cmakedefine LIBEXCEPT_SIGNAL_AWARE
+
+/**
+ * Defined when libexcept is compiled with multi-threading support.
+ */
+#cmakedefine LIBEXCEPT_THREAD_AWARE
+
+/**
+ * Defined when libexcept uses setjmp/longjmp for its implementation.
+ *
+ * Currently this is always defined.
+ */
+#cmakedefine LIBEXCEPT_SJLJ
+
+#endif // LIBEXCEPT_CONFIG_H
