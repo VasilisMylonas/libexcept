@@ -206,7 +206,7 @@ void __libexcept_unhandled()
     }
     else
     {
-        fputs("Unhandled exception\n", stderr);
+        fprintf(stderr, "Unhandled exception of type \"%s\"\n", current_id);
     }
 
 #ifdef LIBEXCEPT_THREAD_AWARE
@@ -234,7 +234,7 @@ void __libexcept_unexpected()
     }
     else
     {
-        fputs("Unexpected exception\n", stderr);
+        fprintf(stderr, "Unexpected exception of type \"%s\"\n", current_id);
     }
 
 #ifdef LIBEXCEPT_THREAD_AWARE
