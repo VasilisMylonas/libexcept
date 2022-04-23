@@ -44,6 +44,8 @@ static const char* current_id;
 
 static void __libexcept_handle_signal(int signal, siginfo_t* info, void* context)
 {
+    (void)context;
+
     switch (signal)
     {
     case SIGFPE: {
