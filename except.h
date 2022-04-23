@@ -46,8 +46,6 @@
  * For optimal debugging experience this library can be combined with Ian Lance Taylor's
  * libbacktrace (https://github.com/ianlancetaylor/libbacktrace) to attach backtraces to thrown
  * exceptions. Glibc also provides backtrace support via the execinfo.h header.
- *
- * TODO: documentation
  */
 
 #include "config.h"
@@ -62,10 +60,9 @@
  * @defgroup keywords Exception handling keywords.
  *
  * try: Begins a code block from which exceptions are expected to be thrown.
- * catch: Follows a try block and only executes when an exception is thrown.
+ * catch: Follows a try block and only executes when an exception of the specified type is thrown.
+ * catch_any: Similar to a catch block except it matches every thrown object.
  * finally: Follows a try block and is always executed. This is useful for cleaning up resources.
- *
- * TODO: catch_any
  *
  * catch/finally blocks are only required to come after a try block but not in a specific order. In
  * particular all of the following are valid:
@@ -73,27 +70,34 @@
  * @code
  *
  * try { ... }
- * catch (int error) { ... }
+ * catch (int, error) { ... }
  * finally { ... }
  *
  * try { ... }
  * finally { ... }
- * catch (int error) { ... }
+ * catch (int, error) { ... }
  *
  * try { ... }
- * catch (int error) { ... }
+ * catch (int, error) { ... }
  *
  * try { ... }
  * finally { ... }
+ *
+ * try { ... }
+ * catch (int, error) { ... }
+ * finally { ... }
+ * catch (arithmetic_error_t, error) { ... }
  *
  * @endcode
+ *
+ * catch clauses are, however, searched in the order they are declared. This has the effect that
+ * catch_any must be the last in line because it matches every thrown object.
  *
  * throw: Throws an exception. Execution of the current function immediately halts.
  * rethrow: Re-throws an exception caught in a catch block. This will preserve the original
  *          exception object.
  *
- *
- * If any of these keyword macros interfere with other symbol names you may choose to prevent their
+ * If any of these keyword macros interfere with other symbol names, you may choose to prevent their
  * definition. This can be done by defining the LIBEXCEPT_NO_KEYWORDS macro. The same constructs can
  * be used under the following names:
  *
@@ -169,8 +173,6 @@ extern void (*libexcept_on_unexpected)(void* exception);
  */
 
 #ifdef LIBEXCEPT_SIGNAL_AWARE
-// TODO: Documentation
-
 /**
  * Enables transforming of signals to exceptions.
  */
@@ -181,37 +183,65 @@ void libexcept_enable_sigcatch();
  */
 void libexcept_disable_sigcatch();
 
+/**
+ * Thrown whenever an arithmetic related error (such as division by zero) occurs. This error
+ * directly coresponds to SIGFPE. Although these errors are probably due to buggy code, they are
+ * most likely not fatal and safe to catch.
+ */
 typedef struct
 {
     const char* message;
     void* pc;
 } arithmetic_error_t;
 
+/**
+ * Thrown whenever an illegal, privileged or malformed instruction is executed. This error directly
+ * coresponds to SIGILL. These errors should never happen under normal circumstances and their
+ * occurrence is usually fatal. It is not advised to handle these sorts of errors.
+ */
 typedef struct
 {
     const char* message;
     void* pc;
 } illegal_instruction_error_t;
 
+/**
+ * Thrown whenever the stack is corrupted (for example on stack overflow). This error roughly
+ * coresponds to SIGILL. This error is fatal.
+ */
 typedef struct
 {
     const char* message;
     void* pc;
 } stack_corruption_error_t;
 
+/**
+ * Thrown whenever a program tries to access memory which it does not have ownership of. This error
+ * coresponds to SIGSEGV and some instances of SIGBUS. This error usually means an invalid or NULL
+ * pointer was dereferenced. This is the cause of a serious program bug and should not be handled.
+ */
 typedef struct
 {
     const char* message;
     void* address;
 } access_violation_t;
 
+/**
+ * This is thrown on some occasions when a program dereferences a pointer not properly aligned for
+ * the data type it points to. Sometimes this may manifest itself as an access_violation_t. It
+ * corresponds to some instances of SIGBUS. As with access_violation_t it is a result of buggy code
+ * and should not be handled.
+ */
 typedef struct
 {
     const char* message;
     void* address;
 } misaligned_access_error_t;
-
 #endif
+
+/*
+  End of public API.
+ */
 
 #ifdef LIBEXCEPT_SIGNAL_AWARE
 #define __LIBEXCEPT_JMP_BUF        jmp_buf
@@ -280,8 +310,8 @@ typedef struct
     for (__libexcept_stage = __LIBEXCEPT_STAGE_UNEXPECTED; __libexcept_stage != stage;             \
          __libexcept_stage = stage)
 
-/**
- * Calls to these are inserted automatically by the macro system. Direct usage is not intended.
+/*
+  Calls to these are inserted automatically by the macro system. Direct usage is not intended.
  */
 
 __LIBEXCEPT_JMP_BUF** __libexcept_current_context();
