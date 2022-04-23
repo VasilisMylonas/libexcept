@@ -35,13 +35,17 @@
  * @date 2022-04-09
  * @copyright Copyright (c) 2022 Vasilis Mylonas
  *
- * libexcept provides a simple exception implementation in pure C. It does this by providing macros
+ * libexcept provides a simple exception implementation in pure C. It does so by providing macros
  * that use setjmp and longjmp in a way that simulates try/catch/finally blocks.
  *
  * Safety rules:
  * - Only use rethrow() inside catch blocks.
  * - Do not use break, continue, return, goto or other ways to exit try/catch/finally blocks.
  * - Do not use anything beginning with __libexcept.
+ *
+ * For optimal debugging experience this library can be combined with Ian Lance Taylor's
+ * libbacktrace (https://github.com/ianlancetaylor/libbacktrace) to attach backtraces to thrown
+ * exceptions. Glibc also provides backtrace support via the execinfo.h header.
  *
  * TODO: documentation
  */
@@ -227,8 +231,8 @@ typedef struct
 #define __LIBEXCEPT_UNIQUE(var)      __LIBEXCEPT_CONCAT(__libexcept_##var, __LINE__)
 #define __LIBEXCEPT_CONCAT(a, b)     __LIBEXCEPT_CONCAT_(a, b)
 #define __LIBEXCEPT_CONCAT_(a, b)    a##b
-#define __LIBEXCEPT_THROW(T, object)                                                               \
-    __libexcept_throw(#T, sizeof(T), (T[1]){object});                                              \
+#define __LIBEXCEPT_THROW(T, ...)                                                                  \
+    __libexcept_throw(#T, sizeof(T), (T[1]){__VA_ARGS__});                                         \
     static_assert(sizeof(T) <= LIBEXCEPT_MAX_THROWABLE_SIZE,                                       \
                   "Throwable object size exceeds the maximum supported by libexcept")
 #define __LIBEXCEPT_RETHROW() break
@@ -275,6 +279,10 @@ typedef struct
 #define __LIBEXCEPT_UNEXPECTED_LOOP(stage)                                                         \
     for (__libexcept_stage = __LIBEXCEPT_STAGE_UNEXPECTED; __libexcept_stage != stage;             \
          __libexcept_stage = stage)
+
+/**
+ * Calls to these are inserted automatically by the macro system. Direct usage is not intended.
+ */
 
 __LIBEXCEPT_JMP_BUF** __libexcept_current_context();
 noreturn void __libexcept_throw(const char*, size_t, void*);
