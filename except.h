@@ -262,10 +262,28 @@ typedef struct
 #define __LIBEXCEPT_CONCAT(a, b)     __LIBEXCEPT_CONCAT_(a, b)
 #define __LIBEXCEPT_CONCAT_(a, b)    a##b
 #define __LIBEXCEPT_THROW(T, ...)                                                                  \
-    __libexcept_throw(#T, sizeof(T), (T[1]){__VA_ARGS__});                                         \
+    __libexcept_throw(__LIBEXCEPT_TYPE_NAME(T), sizeof(T), (T[1]){__VA_ARGS__});                   \
     static_assert(sizeof(T) <= LIBEXCEPT_MAX_THROWABLE_SIZE,                                       \
                   "Throwable object size exceeds the maximum supported by libexcept")
 #define __LIBEXCEPT_RETHROW() break
+
+#define __LIBEXCEPT_TYPE_NAME(T)                                                                   \
+    _Generic((T){0}, signed char                                                                   \
+             : "schar", unsigned char                                                              \
+             : "uchar", char                                                                       \
+             : "char", short                                                                       \
+             : "short", unsigned short                                                             \
+             : "ushort", int                                                                       \
+             : "int", unsigned int                                                                 \
+             : "uint", long                                                                        \
+             : "long", unsigned long                                                               \
+             : "ulong", long long                                                                  \
+             : "longlong", unsigned long long                                                      \
+             : "ulonglong", float                                                                  \
+             : "float", double                                                                     \
+             : "double", long double                                                               \
+             : "ldbl", default                                                                     \
+             : #T)
 
 #define __LIBEXCEPT_TRY                                                                            \
     __LIBEXCEPT_JMP_BUF __LIBEXCEPT_UNIQUE(local_buffer);                                          \
@@ -291,7 +309,7 @@ typedef struct
 
 #define __LIBEXCEPT_CATCH(T, var)                                                                  \
     else if (__libexcept_stage == __LIBEXCEPT_STAGE_CATCH && __libexcept_error != 0 &&             \
-             __libexcept_personality(#T))                                                          \
+             __libexcept_personality(__LIBEXCEPT_TYPE_NAME(T)))                                    \
         __LIBEXCEPT_UNEXPECTED_LOOP(                                                               \
             __LIBEXCEPT_STAGE_CATCH) for (T var = *(T*)__libexcept_current_exception();            \
                                           __libexcept_error != 0;                                  \
